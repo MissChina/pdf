@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多照片转PDF工具 - 高级版</title>
+    <!-- 引入jsPDF库用于PDF生成 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- 引入JSZip库用于ZIP压缩包生成 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- 引入FileSaver库用于文件下载 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <!-- 引入exif-js库用于读取EXIF信息 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.js"></script>
+    <!-- 引入Sortable.js库用于拖拽排序 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <!-- 引入QRCode.js库用于二维码生成 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .description {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #666;
+        }
+        .upload-area {
+            border: 2px dashed #3498db;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: #f8fafc;
+        }
+        .upload-area:hover {
+            border-color: #2980b9;
+            background-color: #eef5fd;
+        }
+        .upload-icon {
+            font-size: 40px;
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+        .preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .preview-item {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .preview-item:hover {
+            transform: scale(1.03);
+        }
+        .preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .preview-item .remove-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background-color: rgba(231, 76, 60, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+        .preview-item .info-label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            font-size: 12px;
+            padding: 3px 5px;
+            text-align: center;
+        }
+        .preview-item .remove-btn:hover {
+            background-color: rgba(192, 57, 43, 0.9);
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .clear-btn {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .clear-btn:hover {
+            background-color: #c0392b;
+        }
+        .generate-btn {
+            background-color: #2ecc71;
+            color: white;
+        }
+        .generate-btn:hover {
+            background-color: #27ae60;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .options {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .option-group {
+            margin-bottom: 15px;
+        }
+        .option-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .option-description {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .compression-slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        .compression-slider {
+            flex-grow: 1;
+        }
+        .slider-value {
+            width: 35px;
+            text-align: center;
+        }
+        .tabbed-buttons {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        .tab-button {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            background-color: #f1f1f1;
+            border: 1px solid #ddd;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-button:first-child {
+            border-radius: 4px 0 0 4px;
+        }
+        .tab-button:last-child {
+            border-radius: 0 4px 4px 0;
+        }
+        .tab-button.active {
+            background-color: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto;
+        }
+        .status-bar {
+            margin-top: 10px;
+            height: 20px;
+            position: relative;
+            display: none;
+        }
+        .status-progress {
+            height: 100%;
+            width: 0;
+            background-color: #3498db;
+            position: absolute;
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        .status-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-size: 12px;
+            line-height: 20px;
+            text-shadow: 0 0 3px rgba(0,0,0,0.5);
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        
+        /* 提示框样式 */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            margin-left: 5px;
+            cursor: help;
+        }
+        .tooltip-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background-color: #3498db;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            font-size: 12px;
+            line-height: 16px;
+        }
+        .tooltip-text {
+            visibility: hidden;
+            width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -125px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        /* 主题切换样式 */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            font-size: 20px;
+            z-index: 1000;
+            transition: all 0.3s;
+        }
+        .theme-toggle:hover {
+            background: #2980b9;
+            transform: scale(1.1);
+        }
+        
+        /* 暗黑主题 */
+        .dark-theme {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+        }
+        .dark-theme .container {
+            background-color: #34495e;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+        .dark-theme .upload-area {
+            background-color: #3c5168;
+            border-color: #5dade2;
+        }
+        .dark-theme .upload-area:hover {
+            background-color: #4a6180;
+        }
+        .dark-theme .options {
+            background-color: #3c5168;
+            border-color: #566b7a;
+        }
+        .dark-theme .tab-button {
+            background-color: #34495e;
+            border-color: #566b7a;
+            color: #ecf0f1;
+        }
+        .dark-theme .tab-button.active {
+            background-color: #3498db;
+        }
+        
+        /* 图片编辑工具栏样式 */
+        .edit-toolbar {
+            position: absolute;
+            top: 30px;
+            left: 5px;
+            right: 5px;
+            display: none;
+            flex-wrap: wrap;
+            gap: 3px;
+            z-index: 10;
+        }
+        .preview-item:hover .edit-toolbar {
+            display: flex;
+        }
+        .edit-btn {
+            background: rgba(52, 152, 219, 0.9);
+            color: white;
+            border: none;
+            border-radius: 3px;
+            width: 24px;
+            height: 24px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+        .edit-btn:hover {
+            background: rgba(41, 128, 185, 1);
+        }
+        
+        /* 多页面布局选项 */
+        .layout-grid {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .layout-option {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .layout-option:hover {
+            background-color: #f0f8ff;
+        }
+        .layout-option.active {
+            background-color: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+        
+        /* 图片编辑模态框 */
+        .edit-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        .edit-modal.show {
+            display: flex;
+        }
+        .edit-modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow: auto;
+        }
+        .edit-canvas {
+            max-width: 100%;
+            max-height: 60vh;
+            border: 1px solid #ddd;
+        }
+        .edit-controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        .slider-group label {
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        /* 语言切换样式 */
+        .lang-toggle {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 12px;
+            z-index: 1000;
+            transition: all 0.3s;
+        }
+        .lang-toggle:hover {
+            background: #219a52;
+        }
+        
+        /* 拖拽排序样式 */
+        .preview-item.sortable-ghost {
+            opacity: 0.5;
+        }
+        .preview-item.sortable-drag {
+            transform: rotate(5deg);
+        }
+        
+        /* EXIF信息显示 */
+        .exif-info {
+            position: absolute;
+            top: 50px;
+            left: 5px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            font-size: 10px;
+            padding: 3px 5px;
+            border-radius: 3px;
+            max-width: 140px;
+            display: none;
+            word-wrap: break-word;
+        }
+        .preview-item:hover .exif-info {
+            display: block;
+        }
+        
+        /* 分批处理进度条 */
+        .batch-progress {
+            margin-top: 10px;
+            display: none;
+        }
+        .batch-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .batch-item:last-child {
+            border-bottom: none;
+        }
+        .batch-status {
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .batch-status.pending {
+            background: #f39c12;
+            color: white;
+        }
+        .batch-status.processing {
+            background: #3498db;
+            color: white;
+        }
+        .batch-status.completed {
+            background: #27ae60;
+            color: white;
+        }
+        .batch-status.error {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        /* 水印设置 */
+        .watermark-options {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px dashed #ddd;
+            border-radius: 4px;
+        }
+        .watermark-preview {
+            width: 100px;
+            height: 70px;
+            border: 1px solid #ddd;
+            margin: 10px 0;
+            position: relative;
+            background: #f9f9f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #666;
+        }
+        
+        /* 快捷键提示 */
+        .shortcuts-help {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            display: none;
+            z-index: 1000;
+        }
+        .shortcuts-help.show {
+            display: block;
+        }
+        
+        /* 响应式设计增强 */
+        @media (max-width: 768px) {
+            .preview-item {
+                width: 120px;
+                height: 120px;
+            }
+            .edit-toolbar {
+                top: 25px;
+            }
+            .edit-btn {
+                width: 20px;
+                height: 20px;
+                font-size: 10px;
+            }
+            .theme-toggle {
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+            }
+            .lang-toggle {
+                font-size: 10px;
+                padding: 6px 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 主题切换按钮 -->
+    <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
+    
+    <!-- 语言切换按钮 -->
+    <button class="lang-toggle" id="langToggle" title="切换语言">EN</button>
+    
+    <!-- 快捷键帮助 -->
+    <div class="shortcuts-help" id="shortcutsHelp">
+        <div><strong>快捷键:</strong></div>
+        <div>Ctrl+O: 打开文件</div>
+        <div>Ctrl+S: 保存设置</div>
+        <div>Ctrl+G: 生成PDF</div>
+        <div>Delete: 删除选中图片</div>
+        <div>F1: 显示/隐藏帮助</div>
+    </div>
+    
+    <div class="container">
+        <h1 data-lang-key="title">多照片转PDF工具</h1>
+        <p class="description" data-lang-key="description">上传多张照片，将它们转换为高质量PDF文件</p>
+        
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📁</div>
+            <p>点击或拖拽照片到这里上传</p>
+            <p style="font-size: 14px; color: #7f8c8d;">支持JPG、PNG等常见图片格式</p>
+            <input type="file" id="fileInput" multiple accept="image/*" style="display: none;">
+        </div>
+        
+        <div class="options">
+            <div class="option-group">
+                <div class="option-title">PDF质量模式</div>
+                <div class="option-description">选择原始质量保持完全不失真，选择优化质量可减小文件体积</div>
+                <div class="tabbed-buttons">
+                    <div class="tab-button active" data-mode="original">原始质量</div>
+                    <div class="tab-button" data-mode="optimized">优化质量</div>
+                </div>
+                
+                <div id="optimizedOptions" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd;">
+                    <div class="option-title">压缩级别
+                        <div class="tooltip">
+                            <span class="tooltip-icon">?</span>
+                            <span class="tooltip-text">压缩级别越高，文件体积越小，但图像质量可能略有降低。推荐选择80-90之间的值以平衡质量和大小。</span>
+                        </div>
+                    </div>
+                    <div class="compression-slider-container">
+                        <input type="range" id="compressionLevel" class="compression-slider" min="50" max="100" value="85" step="5">
+                        <span id="compressionValue" class="slider-value">85%</span>
+                    </div>
+                    <div class="option-description">更高的数值 = 更好的质量，更大的文件</div>
+                    
+                    <div class="option-title" style="margin-top: 10px;">最大分辨率限制
+                        <div class="tooltip">
+                            <span class="tooltip-icon">?</span>
+                            <span class="tooltip-text">超过此分辨率的图片将被等比例缩小。较低的分辨率可以显著减少PDF大小而不明显影响打印质量。</span>
+                        </div>
+                    </div>
+                    <select id="maxResolution">
+                        <option value="0">无限制 (原始分辨率)</option>
+                        <option value="2000">2000像素 (优质打印)</option>
+                        <option value="1500" selected>1500像素 (推荐平衡值)</option>
+                        <option value="1200">1200像素 (良好质量)</option>
+                        <option value="1000">1000像素 (普通质量)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="option-group">
+                <div class="option-title">PDF页面大小</div>
+                <select id="pageSize">
+                    <option value="a4" selected>A4 (210 × 297 mm)</option>
+                    <option value="a3">A3 (297 × 420 mm)</option>
+                    <option value="letter">Letter (216 × 279 mm)</option>
+                </select>
+            </div>
+            
+            <div class="option-group">
+                <div class="option-title">页面方向</div>
+                <label>
+                    <input type="radio" name="orientation" value="portrait" checked> 纵向
+                </label>
+                <label>
+                    <input type="radio" name="orientation" value="landscape"> 横向
+                </label>
+            </div>
+            
+            <div class="option-group">
+                <div class="option-title" data-lang-key="layout_mode">图片布局模式</div>
+                <div class="layout-grid">
+                    <div class="layout-option active" data-layout="single" data-lang-key="single_page">单页单图</div>
+                    <div class="layout-option" data-layout="grid2" data-lang-key="grid_2">2图网格</div>
+                    <div class="layout-option" data-layout="grid4" data-lang-key="grid_4">4图网格</div>
+                    <div class="layout-option" data-layout="grid6" data-lang-key="grid_6">6图网格</div>
+                </div>
+            </div>
+            
+            <div class="option-group">
+                <div class="option-title" data-lang-key="page_margins">页边距设置</div>
+                <div class="compression-slider-container">
+                    <span data-lang-key="margin_small">小</span>
+                    <input type="range" id="pageMargin" min="5" max="30" value="10" step="5">
+                    <span id="marginValue">10mm</span>
+                    <span data-lang-key="margin_large">大</span>
+                </div>
+            </div>
+            
+            <div class="option-group">
+                <div class="option-title" data-lang-key="watermark_settings">水印设置</div>
+                <label>
+                    <input type="checkbox" id="enableWatermark"> <span data-lang-key="enable_watermark">启用水印</span>
+                </label>
+                <div class="watermark-options" id="watermarkOptions">
+                    <div>
+                        <label data-lang-key="watermark_text">水印文字:</label>
+                        <input type="text" id="watermarkText" placeholder="水印内容" value="CONFIDENTIAL">
+                    </div>
+                    <div>
+                        <label data-lang-key="watermark_opacity">透明度:</label>
+                        <input type="range" id="watermarkOpacity" min="10" max="80" value="30">
+                        <span id="watermarkOpacityValue">30%</span>
+                    </div>
+                    <div class="watermark-preview" id="watermarkPreview">
+                        <span>水印预览</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="option-group">
+                <div class="option-title" data-lang-key="page_numbering">页码设置</div>
+                <label>
+                    <input type="checkbox" id="enablePageNumbers"> <span data-lang-key="enable_page_numbers">添加页码</span>
+                </label>
+            </div>
+            
+            <div class="option-group">
+                <div class="option-title">文件名</div>
+                <input type="text" id="fileName" placeholder="照片集" value="照片集">
+            </div>
+        </div>
+        
+        <div class="preview-container" id="previewContainer"></div>
+        
+        <div class="controls">
+            <button id="clearBtn" class="clear-btn" data-lang-key="clear_all">清除所有照片</button>
+            <button id="saveConfigBtn" class="clear-btn" data-lang-key="save_config">保存配置</button>
+            <button id="loadConfigBtn" class="clear-btn" data-lang-key="load_config">加载配置</button>
+            <button id="exportZipBtn" class="clear-btn" data-lang-key="export_zip">导出ZIP</button>
+            <button id="generateBtn" class="generate-btn" disabled data-lang-key="generate_pdf">生成PDF</button>
+        </div>
+        
+        <!-- 分批处理进度 -->
+        <div class="batch-progress" id="batchProgress">
+            <h4 data-lang-key="batch_processing">批处理进度:</h4>
+            <div id="batchList"></div>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <p>正在处理照片并生成PDF，请稍候...</p>
+            <div class="status-bar" id="statusBar">
+                <div class="status-progress" id="statusProgress"></div>
+                <div class="status-text" id="statusText">处理中...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 图片编辑模态框 -->
+    <div class="edit-modal" id="editModal">
+        <div class="edit-modal-content">
+            <h3 data-lang-key="edit_image">编辑图片</h3>
+            <canvas id="editCanvas" class="edit-canvas"></canvas>
+            <div class="edit-controls">
+                <button class="edit-btn" onclick="rotateImage(90)" title="向右旋转90°">↻</button>
+                <button class="edit-btn" onclick="rotateImage(-90)" title="向左旋转90°">↺</button>
+                <button class="edit-btn" onclick="flipImage('horizontal')" title="水平翻转">⇄</button>
+                <button class="edit-btn" onclick="flipImage('vertical')" title="垂直翻转">⇅</button>
+                
+                <div class="slider-group">
+                    <label data-lang-key="brightness">亮度</label>
+                    <input type="range" id="brightnessSlider" min="-50" max="50" value="0">
+                </div>
+                
+                <div class="slider-group">
+                    <label data-lang-key="contrast">对比度</label>
+                    <input type="range" id="contrastSlider" min="-50" max="50" value="0">
+                </div>
+                
+                <div class="slider-group">
+                    <label data-lang-key="saturation">饱和度</label>
+                    <input type="range" id="saturationSlider" min="-50" max="50" value="0">
+                </div>
+                
+                <button class="edit-btn" onclick="applyFilter('grayscale')" data-lang-key="grayscale">黑白</button>
+                <button class="edit-btn" onclick="applyFilter('sepia')" data-lang-key="sepia">复古</button>
+                <button class="edit-btn" onclick="resetFilters()" data-lang-key="reset">重置</button>
+                
+                <button class="generate-btn" onclick="saveImageEdit()" data-lang-key="save_edit">保存编辑</button>
+                <button class="clear-btn" onclick="closeEditModal()" data-lang-key="cancel">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 隐藏的文件输入用于配置加载 -->
+    <input type="file" id="configFileInput" accept=".json" style="display: none;">
+    
+    <div class="footer">
+        <p data-lang-key="footer">© 2025 多照片转PDF工具 - 静态无后端实现</p>
+    </div>
+
+    <script>
+        // 多语言支持
+        const translations = {
+            'zh-CN': {
+                title: '多照片转PDF工具',
+                description: '上传多张照片，将它们转换为高质量PDF文件',
+                layout_mode: '图片布局模式',
+                single_page: '单页单图',
+                grid_2: '2图网格',
+                grid_4: '4图网格',
+                grid_6: '6图网格',
+                page_margins: '页边距设置',
+                margin_small: '小',
+                margin_large: '大',
+                watermark_settings: '水印设置',
+                enable_watermark: '启用水印',
+                watermark_text: '水印文字',
+                watermark_opacity: '透明度',
+                page_numbering: '页码设置',
+                enable_page_numbers: '添加页码',
+                clear_all: '清除所有照片',
+                save_config: '保存配置',
+                load_config: '加载配置',
+                export_zip: '导出ZIP',
+                generate_pdf: '生成PDF',
+                batch_processing: '批处理进度',
+                edit_image: '编辑图片',
+                brightness: '亮度',
+                contrast: '对比度',
+                saturation: '饱和度',
+                grayscale: '黑白',
+                sepia: '复古',
+                reset: '重置',
+                save_edit: '保存编辑',
+                cancel: '取消',
+                footer: '© 2025 多照片转PDF工具 - 静态无后端实现'
+            },
+            'en': {
+                title: 'Multi-Photo to PDF Converter',
+                description: 'Upload multiple photos and convert them to high-quality PDF files',
+                layout_mode: 'Image Layout Mode',
+                single_page: 'Single Image',
+                grid_2: '2-Grid',
+                grid_4: '4-Grid',
+                grid_6: '6-Grid',
+                page_margins: 'Page Margins',
+                margin_small: 'Small',
+                margin_large: 'Large',
+                watermark_settings: 'Watermark Settings',
+                enable_watermark: 'Enable Watermark',
+                watermark_text: 'Watermark Text',
+                watermark_opacity: 'Opacity',
+                page_numbering: 'Page Numbering',
+                enable_page_numbers: 'Add Page Numbers',
+                clear_all: 'Clear All Photos',
+                save_config: 'Save Config',
+                load_config: 'Load Config',
+                export_zip: 'Export ZIP',
+                generate_pdf: 'Generate PDF',
+                batch_processing: 'Batch Processing Progress',
+                edit_image: 'Edit Image',
+                brightness: 'Brightness',
+                contrast: 'Contrast',
+                saturation: 'Saturation',
+                grayscale: 'Grayscale',
+                sepia: 'Sepia',
+                reset: 'Reset',
+                save_edit: 'Save Edit',
+                cancel: 'Cancel',
+                footer: '© 2025 Multi-Photo to PDF Converter - Static Implementation'
+            }
+        };
+        
+        // 全局变量
+        let currentLang = 'zh-CN';
+        let isDarkTheme = false;
+        let uploadedImages = [];
+        let qualityMode = 'original';
+        let currentLayoutMode = 'single';
+        let currentEditingIndex = -1;
+        let originalImageData = null;
+        let sortableInstance = null;
+        let duplicateHashes = new Set();
+        
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+        
+        // 初始化应用
+        function initializeApp() {
+            initializeElements();
+            initializeEventListeners();
+            initializeSortable();
+            initializeKeyboardShortcuts();
+            loadUserPreferences();
+            updateLanguage();
+        }
+        
+        // 初始化DOM元素
+        function initializeElements() {
+            // 基础元素
+            window.uploadArea = document.getElementById('uploadArea');
+            window.fileInput = document.getElementById('fileInput');
+            window.previewContainer = document.getElementById('previewContainer');
+            window.clearBtn = document.getElementById('clearBtn');
+            window.generateBtn = document.getElementById('generateBtn');
+            window.loading = document.getElementById('loading');
+            window.fileNameInput = document.getElementById('fileName');
+            window.pageSizeSelect = document.getElementById('pageSize');
+            window.compressionLevelSlider = document.getElementById('compressionLevel');
+            window.compressionValueDisplay = document.getElementById('compressionValue');
+            window.maxResolutionSelect = document.getElementById('maxResolution');
+            window.statusBar = document.getElementById('statusBar');
+            window.statusProgress = document.getElementById('statusProgress');
+            window.statusText = document.getElementById('statusText');
+            window.optimizedOptions = document.getElementById('optimizedOptions');
+            window.tabButtons = document.querySelectorAll('.tab-button');
+            
+            // 新增元素
+            window.themeToggle = document.getElementById('themeToggle');
+            window.langToggle = document.getElementById('langToggle');
+            window.shortcutsHelp = document.getElementById('shortcutsHelp');
+            window.layoutOptions = document.querySelectorAll('.layout-option');
+            window.pageMarginSlider = document.getElementById('pageMargin');
+            window.marginValue = document.getElementById('marginValue');
+            window.enableWatermark = document.getElementById('enableWatermark');
+            window.watermarkOptions = document.getElementById('watermarkOptions');
+            window.watermarkText = document.getElementById('watermarkText');
+            window.watermarkOpacity = document.getElementById('watermarkOpacity');
+            window.watermarkOpacityValue = document.getElementById('watermarkOpacityValue');
+            window.enablePageNumbers = document.getElementById('enablePageNumbers');
+            window.saveConfigBtn = document.getElementById('saveConfigBtn');
+            window.loadConfigBtn = document.getElementById('loadConfigBtn');
+            window.exportZipBtn = document.getElementById('exportZipBtn');
+            window.configFileInput = document.getElementById('configFileInput');
+            window.batchProgress = document.getElementById('batchProgress');
+            window.batchList = document.getElementById('batchList');
+            window.editModal = document.getElementById('editModal');
+            window.editCanvas = document.getElementById('editCanvas');
+            window.brightnessSlider = document.getElementById('brightnessSlider');
+            window.contrastSlider = document.getElementById('contrastSlider');
+            window.saturationSlider = document.getElementById('saturationSlider');
+            
+            // 初始化显示值
+            compressionValueDisplay.textContent = compressionLevelSlider.value + '%';
+            marginValue.textContent = pageMarginSlider.value + 'mm';
+            watermarkOpacityValue.textContent = watermarkOpacity.value + '%';
+        }
+            
+            // 监听压缩级别滑块变化
+            compressionLevelSlider.addEventListener('input', function() {
+                compressionValueDisplay.textContent = this.value + '%';
+            });
+            
+            // 点击上传区域时触发文件选择
+            uploadArea.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            // 处理拖放事件
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.style.borderColor = '#27ae60';
+                this.style.backgroundColor = '#e8f6f1';
+            });
+            
+            uploadArea.addEventListener('dragleave', function() {
+                this.style.borderColor = '#3498db';
+                this.style.backgroundColor = '#f8fafc';
+            });
+            
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.style.borderColor = '#3498db';
+                this.style.backgroundColor = '#f8fafc';
+                
+                if (e.dataTransfer.files.length > 0) {
+                    handleFiles(e.dataTransfer.files);
+                }
+            });
+            
+            // 监听文件选择变化
+            fileInput.addEventListener('change', function() {
+                if (fileInput.files.length > 0) {
+                    handleFiles(fileInput.files);
+                    fileInput.value = ''; // 重置文件输入，允许重复选择相同的文件
+                }
+            });
+            
+            // 处理质量模式选项卡切换
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+                    qualityMode = this.dataset.mode;
+                    
+                    // 显示或隐藏优化选项
+                    if (qualityMode === 'optimized') {
+                        optimizedOptions.style.display = 'block';
+                    } else {
+                        optimizedOptions.style.display = 'none';
+                    }
+                });
+            });
+            
+            // 处理选择的文件
+            function handleFiles(files) {
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    
+                    // 确保文件是图片
+                    if (!file.type.match('image.*')) {
+                        alert('文件 "' + file.name + '" 不是图片格式，已跳过');
+                        continue;
+                    }
+                    
+                    // 添加文件到数组
+                    uploadedImages.push({
+                        file: file,
+                        size: formatFileSize(file.size)
+                    });
+                    
+                    // 创建预览
+                    const reader = new FileReader();
+                    reader.onload = (function(fileData) {
+                        return function(e) {
+                            createPreviewItem(fileData, e.target.result);
+                        };
+                    })({file: file, size: formatFileSize(file.size)});
+                    reader.readAsDataURL(file);
+                }
+                
+                // 如果有图片则启用生成按钮
+                updateGenerateButton();
+            }
+            
+            // 格式化文件大小
+            function formatFileSize(bytes) {
+                if (bytes < 1024) {
+                    return bytes + ' B';
+                } else if (bytes < 1024 * 1024) {
+                    return (bytes / 1024).toFixed(1) + ' KB';
+                } else {
+                    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+                }
+            }
+            
+            // 创建预览项
+            function createPreviewItem(fileData, imgSrc) {
+                const previewItem = document.createElement('div');
+                previewItem.className = 'preview-item';
+                
+                // 创建图片元素
+                const img = document.createElement('img');
+                img.src = imgSrc;
+                img.title = fileData.file.name;
+                
+                // 创建移除按钮
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'remove-btn';
+                removeBtn.innerHTML = '×';
+                removeBtn.title = '移除此图片';
+                removeBtn.addEventListener('click', function(e) {
+                    e.stopPropagation(); // 防止触发外层容器的点击事件
+                    
+                    // 从数组和DOM中移除该图片
+                    const index = uploadedImages.findIndex(item => item.file === fileData.file);
+                    if (index > -1) {
+                        uploadedImages.splice(index, 1);
+                    }
+                    previewContainer.removeChild(previewItem);
+                    updateGenerateButton();
+                });
+                
+                // 创建信息标签显示图片大小
+                const infoLabel = document.createElement('div');
+                infoLabel.className = 'info-label';
+                infoLabel.textContent = fileData.size;
+                
+                previewItem.appendChild(img);
+                previewItem.appendChild(removeBtn);
+                previewItem.appendChild(infoLabel);
+                previewContainer.appendChild(previewItem);
+            }
+            
+            // 更新生成按钮状态
+            function updateGenerateButton() {
+                generateBtn.disabled = uploadedImages.length === 0;
+            }
+            
+            // 清除所有照片
+            clearBtn.addEventListener('click', function() {
+                uploadedImages = [];
+                previewContainer.innerHTML = '';
+                updateGenerateButton();
+            });
+            
+            // 生成PDF
+            generateBtn.addEventListener('click', async function() {
+                if (uploadedImages.length === 0) return;
+                
+                // 显示加载状态
+                loading.style.display = 'block';
+                statusBar.style.display = 'block';
+                generateBtn.disabled = true;
+                
+                try {
+                    // 获取用户选择的PDF选项
+                    const pageSize = pageSizeSelect.value;
+                    const orientation = document.querySelector('input[name="orientation"]:checked').value;
+                    const layout = document.querySelector('input[name="layout"]:checked').value;
+                    const fileName = fileNameInput.value.trim() || '照片集';
+                    
+                    // 优化质量模式的参数
+                    const compressionLevel = parseInt(compressionLevelSlider.value) / 100;
+                    const maxResolution = parseInt(maxResolutionSelect.value);
+                    
+                    // 创建一个新的jsPDF实例
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF(orientation, 'mm', pageSize);
+                    
+                    // 获取页面尺寸
+                    const pageWidth = pdf.internal.pageSize.getWidth();
+                    const pageHeight = pdf.internal.pageSize.getHeight();
+                    
+                    // 处理每张图片
+                    for (let i = 0; i < uploadedImages.length; i++) {
+                        // 更新进度
+                        const progress = Math.round((i / uploadedImages.length) * 100);
+                        statusProgress.style.width = progress + '%';
+                        statusText.textContent = `处理第 ${i+1}/${uploadedImages.length} 张图片...`;
+                        
+                        // 允许UI更新
+                        await new Promise(resolve => setTimeout(resolve, 0));
+                        
+                        // 如果不是第一页，添加新页
+                        if (i > 0) {
+                            pdf.addPage(pageSize, orientation);
+                        }
+                        
+                        // 准备图片
+                        let imgData;
+                        const file = uploadedImages[i].file;
+                        
+                        if (qualityMode === 'original') {
+                            // 原始质量模式 - 直接使用图片
+                            imgData = await processImageWithOriginalQuality(file);
+                        } else {
+                            // 优化质量模式 - 压缩图片
+                            imgData = await processImageWithOptimizedQuality(file, compressionLevel, maxResolution);
+                        }
+                        
+                        // 计算图片适应页面的尺寸
+                        const dimensions = calculateDimensions(imgData, pageWidth, pageHeight, layout);
+                        
+                        // 在PDF中添加图片
+                        pdf.addImage(
+                            imgData, 
+                            'JPEG', 
+                            dimensions.x, 
+                            dimensions.y, 
+                            dimensions.width, 
+                            dimensions.height, 
+                            undefined, 
+                            'FAST'  // 使用FAST选项以获得更好的质量
+                        );
+                        
+                        // 添加图片文件名作为可选标题（底部小字）
+                        const imgName = file.name;
+                        pdf.setFontSize(8);
+                        pdf.setTextColor(150);
+                        const textWidth = pdf.getStringUnitWidth(imgName) * 8 / pdf.internal.scaleFactor;
+                        const textX = (pageWidth - textWidth) / 2;
+                        pdf.text(imgName, textX, pageHeight - 5);
+                    }
+                    
+                    // 更新状态为完成
+                    statusProgress.style.width = '100%';
+                    statusText.textContent = '生成PDF完成！';
+                    
+                    // 保存PDF
+                    setTimeout(() => {
+                        pdf.save(`${fileName}${qualityMode === 'optimized' ? '_优化' : '_原始'}.pdf`);
+                        
+                        // 隐藏加载状态
+                        loading.style.display = 'none';
+                        statusBar.style.display = 'none';
+                        generateBtn.disabled = false;
+                    }, 500);
+                    
+                } catch (error) {
+                    console.error('生成PDF时出错:', error);
+                    alert('生成PDF时出错，请重试');
+                    loading.style.display = 'none';
+                    statusBar.style.display = 'none';
+                    generateBtn.disabled = false;
+                }
+            });
+            
+            // 处理原始质量的图片
+            async function processImageWithOriginalQuality(file) {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = new Image();
+                        img.onload = function() {
+                            resolve(img);
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+            
+            // 处理优化质量的图片
+            async function processImageWithOptimizedQuality(file, quality, maxResolution) {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = new Image();
+                        img.onload = function() {
+                            // 创建canvas元素进行图片处理
+                            const canvas = document.createElement('canvas');
+                            let width = img.width;
+                            let height = img.height;
+                            
+                            // 如果设置了最大分辨率并且图片尺寸超过限制，则按比例缩小
+                            if (maxResolution > 0 && (width > maxResolution || height > maxResolution)) {
+                                if (width > height) {
+                                    height = Math.round(height * (maxResolution / width));
+                                    width = maxResolution;
+                                } else {
+                                    width = Math.round(width * (maxResolution / height));
+                                    height = maxResolution;
+                                }
+                            }
+                            
+                            // 设置canvas尺寸
+                            canvas.width = width;
+                            canvas.height = height;
+                            
+                            // 绘制图片到canvas
+                            const ctx = canvas.getContext('2d');
+                            
+                            // 使用高质量图像渲染
+                            ctx.imageSmoothingEnabled = true;
+                            ctx.imageSmoothingQuality = 'high';
+                            
+                            // 绘制图像
+                            ctx.drawImage(img, 0, 0, width, height);
+                            
+                            // 转换为图像数据，使用设定的质量
+                            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                            
+                            // 创建新图像对象以返回
+                            const optimizedImg = new Image();
+                            optimizedImg.onload = function() {
+                                resolve(optimizedImg);
+                            };
+                            optimizedImg.src = dataUrl;
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+            
+            // 计算图像在PDF页面上的尺寸和位置
+            function calculateDimensions(img, pageWidth, pageHeight, layout) {
+                const margin = 10; // 页面边距（毫米）
+                const maxWidth = pageWidth - 2 * margin;
+                const maxHeight = pageHeight - 2 * margin;
+                
+                // 计算图像纵横比
+                const imageRatio = img.width / img.height;
+                
+                // 确定适合页面的尺寸
+                let width, height;
+                
+                if (layout === 'fit') {
+                    // 适应模式 - 保持纵横比
+                    if (imageRatio > maxWidth / maxHeight) {
+                        // 图像更宽
+                        width = maxWidth;
+                        height = width / imageRatio;
+                    } else {
+                        // 图像更高
+                        height = maxHeight;
+                        width = height * imageRatio;
+                    }
+                } else {
+                    // 填充模式 - 填满页面（可能裁剪部分图像）
+                    const pageRatio = maxWidth / maxHeight;
+                    
+                    if (imageRatio > pageRatio) {
+                        // 图像更宽，以高度为准
+                        height = maxHeight;
+                        width = height * imageRatio;
+                    } else {
+                        // 图像更高，以宽度为准
+                        width = maxWidth;
+                        height = width / imageRatio;
+                    }
+                }
+                
+                // 计算居中位置
+                const x = (pageWidth - width) / 2;
+                const y = (pageHeight - height) / 2;
+                
+                return { x, y, width, height };
+            }
+        });
+    </script>
+</body>
+</html>
